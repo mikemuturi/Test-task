@@ -1,0 +1,64 @@
+import os
+import hashlib
+import shutil
+
+class FileSystem:
+    def __init__(self, base_path):
+        self.base_path = base_path
+
+    def list_files(self):
+        return set(os.listdir(self.base_path))
+
+    def read_file(self, file_name):
+        with open(os.path.join(self.base_path, file_name), "rb") as f:
+            return f.read()
+
+    def write_file(self, file_name, content):
+        with open(os.path.join(self.base_path, file_name), "wb") as f:
+            f.write(content)
+
+    def remove_file(self, file_name):
+        os.remove(os.path.join(self.base_path, file_name))
+
+    def rename_file(self, old_name, new_name):
+        os.rename(os.path.join(self.base_path, old_name), os.path.join(self.base_path, new_name))
+
+    def exists(self, file_name):
+        return os.path.exists(os.path.join(self.base_path, file_name))
+
+    def get_hash(self, file_name):
+        return hashlib.md5(self.read_file(file_name)).hexdigest()
+
+def sync_directories(source_path, dest_path):
+    source_fs = FileSystem(source_path)
+    dest_fs = FileSystem(dest_path)
+
+    source_files = source_fs.list_files()
+    dest_files = dest_fs.list_files()
+
+    for file_name in source_files - dest_files:
+        shutil.copy2(os.path.join(source_path, file_name), os.path.join(dest_path, file_name))
+
+    for file_name in dest_files - source_files:
+        dest_fs.remove_file(file_name)
+
+    for file_name in source_files.intersection(dest_files):
+        source_hash = source_fs.get_hash(file_name)
+        dest_hash = dest_fs.get_hash(file_name)
+
+        if source_hash != dest_hash:
+            dest_fs.remove_file(file_name)
+            shutil.copy2(os.path.join(source_path, file_name), os.path.join(dest_path, file_name))
+
+        if file_name != os.path.basename(source_path):
+            source_base = os.path.splitext(os.path.basename(file_name))[0]
+            dest_base = os.path.splitext(os.path.basename(dest_path))[0]
+
+            if source_base != dest_base:
+                dest_fs.rename_file(file_name, os.path.join(os.path.dirname(file_name), source_base + os.path.splitext(file_name)[1]))
+
+if __name__ == "__main__":
+    source_path = input("Enter source directory path: ")
+    dest_path = input("Enter destination directory path: ")
+    sync_directories(source_path, dest_path)
+
